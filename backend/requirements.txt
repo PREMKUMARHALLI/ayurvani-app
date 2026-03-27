@@ -1,3 +1,5 @@
 fastapi>=0.116.0
 uvicorn[standard]>=0.30.0
 google-generativeai
+pydantic>=2.0.0
+python-multipart
