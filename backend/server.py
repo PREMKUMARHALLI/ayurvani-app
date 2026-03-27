@@ -200,8 +200,7 @@ async def chat_status() -> Dict[str, Any]:
 
 api_key = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=api_key)
-ai_model = genai.GenerativeModel('gemini-1.5-flash')
-
+ai_model = genai.GenerativeModel('gemini-1.5-flash-latest')
 @app.post("/api/chat/message")
 async def send_message(msg: ChatMessage, request: Request) -> ChatResponse:
     user = get_session_user(request)
