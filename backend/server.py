@@ -10,20 +10,31 @@ from pydantic import BaseModel
 
 app = FastAPI(title="AyurVani API", version="1.0.0")
 
-FRONTEND_ORIGINS = os.getenv("FRONTEND_ORIGINS", "")
-ALLOWED_ORIGINS = [o.strip() for o in FRONTEND_ORIGINS.split(",") if o.strip()]
-SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "session")
-SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
-SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "lax").lower()
+# 1. Hardcode the Vercel domains so we know 100% they are allowed
+ALLOWED_ORIGINS = [
+    "https://ayurvani-app.vercel.app",
+    "https://ayurvani-frontend.vercel.app",
+    "http://localhost:5173"
+]
 
-# fallback for local development
-if not ALLOWED_ORIGINS:
-    ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-    ]
+# Add any extra ones from Render environment variables just in case
+FRONTEND_ORIGINS = os.getenv("FRONTEND_ORIGINS", "")
+if FRONTEND_ORIGINS:
+    ALLOWED_ORIGINS.extend([o.strip() for o in FRONTEND_ORIGINS.split(",") if o.strip()])
+
+# 2. Add the CORS Middleware (allow_credentials=True is the magic key for logins)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True, 
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 3. Force strict cross-origin cookie rules so Chrome doesn't block the login
+SESSION_COOKIE_NAME = "session"
+SESSION_COOKIE_SECURE = True      # MUST be True for cross-origin (Render -> Vercel)
+SESSION_COOKIE_SAMESITE = "none"  # MUST be "none" to allow cookies across different domains
 
 app.add_middleware(
     CORSMiddleware,
