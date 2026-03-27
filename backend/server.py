@@ -6,12 +6,15 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 app = FastAPI(title="AyurVani API", version="1.0.0")
 
 FRONTEND_ORIGINS = os.getenv("FRONTEND_ORIGINS", "")
 ALLOWED_ORIGINS = [o.strip() for o in FRONTEND_ORIGINS.split(",") if o.strip()]
+SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "session")
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "lax").lower()
 
 # fallback for local development
 if not ALLOWED_ORIGINS:
@@ -40,7 +43,7 @@ def utc_now_iso() -> str:
 
 
 def get_session_user(request: Request) -> Optional[Dict[str, Any]]:
-    token = request.cookies.get("session")
+    token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
         return None
     user_id = SESSIONS_BY_TOKEN.get(token)
@@ -49,19 +52,30 @@ def get_session_user(request: Request) -> Optional[Dict[str, Any]]:
     return USERS_BY_ID.get(user_id)
 
 
+def set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        token,
+        httponly=True,
+        samesite=SESSION_COOKIE_SAMESITE,
+        secure=SESSION_COOKIE_SECURE,
+        path="/",
+    )
+
+
 class AuthLanguageUpdate(BaseModel):
     language: str
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     name: str
     preferred_language: str
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -101,6 +115,11 @@ async def root() -> Dict[str, str]:
     return {"message": "AyurVani API - Ayurvedic SLM Backend (demo)", "version": "1.0.0"}
 
 
+@app.get("/api/")
+async def api_root() -> Dict[str, str]:
+    return {"message": "AyurVani API - Ayurvedic SLM Backend (demo)", "version": "1.0.0"}
+
+
 @app.get("/api/auth/me")
 async def me(request: Request) -> Any:
     user = get_session_user(request)
@@ -127,7 +146,7 @@ async def register(req: RegisterRequest, response: Response) -> Any:
 
     token = str(uuid.uuid4())
     SESSIONS_BY_TOKEN[token] = user_id
-    response.set_cookie("session", token, httponly=True, samesite="lax", path="/")
+    set_session_cookie(response, token)
     # Don't leak password
     user_out = {k: v for k, v in user.items() if k != "password"}
     return user_out
@@ -147,17 +166,17 @@ async def login(req: LoginRequest, response: Response) -> Any:
 
     token = str(uuid.uuid4())
     SESSIONS_BY_TOKEN[token] = user["id"]
-    response.set_cookie("session", token, httponly=True, samesite="lax", path="/")
+    set_session_cookie(response, token)
     user_out = {k: v for k, v in user.items() if k != "password"}
     return user_out
 
 
 @app.post("/api/auth/logout")
 async def logout(request: Request, response: Response) -> Dict[str, str]:
-    token = request.cookies.get("session")
+    token = request.cookies.get(SESSION_COOKIE_NAME)
     if token:
         SESSIONS_BY_TOKEN.pop(token, None)
-    response.delete_cookie("session", path="/")
+    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
     return {"ok": "logged out"}
 
 
