@@ -4,6 +4,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import google.generativeai as genai
+
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -208,10 +210,9 @@ async def chat_status() -> Dict[str, Any]:
         "ollama": {"available": True, "url": "http://localhost:11434"},
         "cloud": {"available": False},
     }
-
+ai_model = genai.GenerativeModel('gemini-pro')
 api_key = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=api_key)
-ai_model = genai.GenerativeModel('gemini-1.5-flash-latest')
 @app.post("/api/chat/message")
 async def send_message(msg: ChatMessage, request: Request) -> ChatResponse:
     user = get_session_user(request)
